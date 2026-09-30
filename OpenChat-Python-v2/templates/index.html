@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>OpenChat</title><link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div class="wrap">
+<header class="top"><div><h1>OpenChat</h1><span>グループで話そう</span></div></header>
+
+{% if user %}
+<section class="profile card">
+  <div class="avatar large">
+    {% if user.avatar %}<img src="{{user.avatar}}" alt="">
+    {% else %}<span>{{user.name[:1]}}</span>{% endif %}
+  </div>
+  <div class="profile-main">
+    <b>{{user.name}}</b><button onclick="document.getElementById('profile').classList.toggle('hidden')">プロフィール編集</button>
+  </div>
+  <form method="post" action="/logout"><button>ログアウト</button></form>
+</section>
+<form id="profile" class="card hidden" method="post" action="/profile" enctype="multipart/form-data">
+  <h2>プロフィール</h2>
+  <input name="name" value="{{user.name}}" maxlength="30" required>
+  <label class="file">アイコンを選択<input type="file" name="avatar" accept="image/*"></label>
+  <button class="primary">保存</button>
+</form>
+
+<section class="card">
+<h2>グループを作る</h2>
+<form method="post" action="/groups/create" class="form">
+<input name="name" placeholder="グループ名" maxlength="50" required>
+<input name="description" placeholder="説明（任意）" maxlength="200">
+<button class="primary">作成</button>
+</form>
+</section>
+
+<section class="card">
+<h2>招待コードで参加</h2>
+<form method="post" action="/groups/join" class="form">
+<input name="code" placeholder="招待コード" required>
+<button>参加</button>
+</form>
+</section>
+
+<section>
+<h2>公開グループ</h2>
+<div class="groups">
+{% for g in groups %}
+<a class="group" href="/group/{{g.id}}">
+  <div class="groupicon">💬</div>
+  <div><b>{{g.name}}</b><p>{{g.description or '説明なし'}}</p></div>
+</a>
+{% else %}<p>まだグループがありません。</p>{% endfor %}
+</div>
+</section>
+{% else %}
+<section class="card login">
+<h2>OpenChatへようこそ</h2>
+<p>ニックネームを設定して始めます。</p>
+<form method="post" action="/login" class="form">
+<input name="name" placeholder="表示名" maxlength="30" required autofocus>
+<button class="primary">入室する</button>
+</form>
+</section>
+{% endif %}
+</div>
+</body>
+</html>

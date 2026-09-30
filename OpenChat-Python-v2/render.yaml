@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: openchat-python
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn --worker-class gevent -w 1 app:app
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DATA_DIR
+        value: /opt/render/project/src/data
+      - key: PYTHON_VERSION
+        value: 3.13.5

@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{{group.name}} - OpenChat</title><link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="chatbody">
+<div class="chat">
+<header class="chathead">
+<a href="/">←</a>
+<div class="chat-title"><h1>{{group.name}}</h1><small>{{group.description}}</small></div>
+<button id="copyCode">招待コード</button>
+</header>
+
+<main id="messages">
+{% for m in messages %}
+<div class="msg {% if m.user_name == user.name %}mine{% endif %}">
+  <div class="avatar">
+    {% if m.avatar %}<img src="{{m.avatar}}" alt="">
+    {% else %}<span>{{m.user_name[:1]}}</span>{% endif %}
+  </div>
+  <div class="msgbody">
+    <div class="name">{{m.user_name}}</div>
+    {% if m.body %}<div class="bubble textbody" data-text="{{m.body|e}}"></div>{% endif %}
+    {% if m.image_url %}<a href="{{m.image_url}}" target="_blank" rel="noopener"><img class="message-image" src="{{m.image_url}}" alt="画像"></a>{% endif %}
+  </div>
+</div>
+{% endfor %}
+</main>
+
+<form id="send" class="send">
+  <label class="attach" title="画像を送る">📷<input id="image" type="file" accept="image/png,image/jpeg,image/gif,image/webp"></label>
+  <input id="body" autocomplete="off" maxlength="2000" placeholder="メッセージ…">
+  <button>送信</button>
+</form>
+<div id="preview" class="preview hidden"></div>
+</div>
+
+<script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
+<script>
+const socket = io();
+const groupId = {{group.id}};
+const myName = {{user.name|tojson}};
+const messages = document.getElementById("messages");
+
+function linkify(el, text) {
+  const re = /(https?:\/\/[^\s<]+|www\.[^\s<]+)/gi;
+  let last = 0, match;
+  while ((match = re.exec(text)) !== null) {
+    el.appendChild(document.createTextNode(text.slice(last, match.index)));
+    let url = match[0];
+    const trailing = url.match(/[.,!?、。)]+$/);
+    const suffix = trailing ? trailing[0] : "";
+    if (suffix) url = url.slice(0, -suffix.length);
+    const a = document.createElement("a");
+    a.href = url.startsWith("www.") ? "https://" + url : url;
+    a.target = "_blank"; a.rel = "noopener noreferrer"; a.textContent = url;
+    el.appendChild(a);
+    if (suffix) el.appendChild(document.createTextNode(suffix));
+    last = match.index + match[0].length;
+  }
+  el.appendChild(document.createTextNode(text.slice(last)));
+}
+
+function addMessage(m) {
+  const row = document.createElement("div");
+  row.className = "msg " + (m.user_name === myName ? "mine" : "");
+
+  const avatar = document.createElement("div");
+  avatar.className = "avatar";
+  if (m.avatar) {
+    const img = document.createElement("img"); img.src = m.avatar; img.alt = "";
+    avatar.appendChild(img);
+  } else avatar.textContent = m.user_name.slice(0,1);
+
+  const body = document.createElement("div");
+  body.className = "msgbody";
+
+  const name = document.createElement("div");
+  name.className = "name"; name.textContent = m.user_name;
+  body.appendChild(name);
+
+  if (m.body) {
+    const bubble = document.createElement("div");
+    bubble.className = "bubble";
+    linkify(bubble, m.body);
+    body.appendChild(bubble);
+  }
+
+  if (m.image_url) {
+    const a = document.createElement("a");
+    a.href=m.image_url; a.target="_blank"; a.rel="noopener";
+    const img=document.createElement("img");
+    img.className="message-image"; img.src=m.image_url; img.alt="画像";
+    a.appendChild(img); body.appendChild(a);
+  }
+  row.append(avatar, body);
+  messages.appendChild(row);
+  messages.scrollTop = messages.scrollHeight;
+}
+
+document.querySelectorAll(".textbody").forEach(el => {
+  const text = el.dataset.text;
+  el.textContent = ""; linkify(el, text);
+});
+
+socket.on("connect", () => socket.emit("join", {group_id: groupId}));
+socket.on("message", addMessage);
+
+document.getElementById("send").addEventListener("submit", async e => {
+  e.preventDefault();
+  const input=document.getElementById("body");
+  const file=document.getElementById("image");
+  let imageUrl="";
+  if (file.files[0]) {
+    const fd=new FormData(); fd.append("image",file.files[0]);
+    const res=await fetch("/upload",{method:"POST",body:fd});
+    const data=await res.json();
+    if (!res.ok) { alert(data.error || "画像アップロードに失敗しました"); return; }
+    imageUrl=data.url;
+  }
+  if (input.value.trim() || imageUrl) {
+    socket.emit("send_message",{group_id:groupId,body:input.value,image_url:imageUrl});
+    input.value=""; file.value=""; document.getElementById("preview").classList.add("hidden");
+    input.focus();
+  }
+});
+
+document.getElementById("image").addEventListener("change",e=>{
+  const f=e.target.files[0], p=document.getElementById("preview");
+  if (!f) {p.classList.add("hidden");return;}
+  const url=URL.createObjectURL(f);
+  p.innerHTML="選択中: "+f.name+" ("+Math.round(f.size/1024)+" KB)";
+  p.classList.remove("hidden");
+});
+
+document.getElementById("copyCode").onclick=async()=>{
+  const code={{group.invite_code|tojson}};
+  await navigator.clipboard.writeText(code);
+  alert("招待コード: "+code+"\nコピーしました");
+};
+messages.scrollTop=messages.scrollHeight;
+</script>
+</body>
+</html>
